@@ -1,6 +1,16 @@
 import streamlit as st
 from signals import WATCH_DEFAULT, load_universe, market_mood, analyze_stock
 st.set_page_config(page_title='Fear-RSI STOCK',page_icon='📊',layout='wide')
+st.markdown('''<style>
+@media(max-width: 640px){
+  .block-container{padding:1.0rem .8rem 2rem!important}
+  h1{font-size:1.9rem!important;line-height:1.2!important}
+  h2,h3{font-size:1.25rem!important;overflow-wrap:anywhere}
+  div[data-testid="stMetricValue"]{font-size:1.5rem!important}
+  div[data-testid="stMetricLabel"]{font-size:.82rem!important}
+  .stButton button{max-width:100%;white-space:normal}
+}
+</style>''',unsafe_allow_html=True)
 st.title('📊 Fear-RSI STOCK')
 st.caption('한국 주식 매수·매도 참고 신호 | 자동 주문 없음 | 확정봉 기준')
 @st.cache_data(ttl=3600,show_spinner=False)
@@ -45,16 +55,27 @@ for code in dict.fromkeys(x.strip().zfill(6) for x in watch.split(',') if x.stri
 st.subheader('🔎 코스피·코스닥 매수 후보 자동 탐색')
 st.caption(f'{source} {len(items)}개 대상 · 일봉 1차 스캔 · 상세 1시간/4시간 검증은 관심 종목에서 확인')
 if st.button('일봉 매수 후보 탐색 실행',type='primary'):
-    found=[];errors=0
+    found=[];all_results=[];failures=[]
     progress=st.progress(0)
     for i,item in enumerate(items):
         try:
             r=stock_cached(item['code'],item['name'],item['market'],False,mt)
+            all_results.append(r)
             if '매수' in r['label']:found.append(r)
-        except Exception:errors+=1
+        except Exception as e:failures.append((item['code'],item['name'],str(e)))
         progress.progress((i+1)/len(items))
     if found:
         st.dataframe([{'종목':r['name'],'코드':r['code'],'시장':r['market'],'일봉 신호':r['label'],'30일 고점 대비':f"{r['drop30']:+.1f}%",'일봉 추세':r['trend'],'종가':f"{r['price']:,.0f}"} for r in found],hide_index=True,use_container_width=True)
     else:st.info('이번 탐색에서 일봉 매수 후보를 찾지 못했습니다.')
-    st.caption(f'검색 완료 {len(items)}개 중 조회 실패 {errors}개. 조회 실패 종목은 신호 없음으로 판단하지 않습니다.')
+    st.subheader('👀 매수 관심 TOP 10')
+    st.caption('매수 신호가 아닌 관찰 목록입니다. RSI가 낮고 30거래일 고점 대비 하락폭이 큰 순서로 정렬합니다. 반등 확인 없이 매수하지 마세요.')
+    ranked=[r for r in all_results if r['frames']['1일']['rsi'] is not None]
+    ranked.sort(key=lambda r:(r['frames']['1일']['rsi'],r['drop30'],r['code']))
+    if ranked:
+        st.dataframe([{'순위':i,'종목':r['name'],'코드':r['code'],'시장':r['market'],'일봉 RSI':r['frames']['1일']['rsi'],'고점 대비':f"{r['drop30']:+.1f}%",'일봉 추세':r['trend'],'종가':f"{r['price']:,.0f}원",'정식 매수 신호':'있음' if '매수' in r['label'] else '없음'} for i,r in enumerate(ranked[:10],1)],hide_index=True,use_container_width=True)
+    else:st.warning('관심 순위를 계산할 데이터가 없습니다.')
+    st.caption(f'검색 완료 {len(items)}개 / 정상 {len(all_results)}개 / 조회 실패 {len(failures)}개. 조회 실패 종목은 신호 없음으로 판단하지 않습니다.')
+    if failures:
+        with st.expander(f'⚠️ 조회 실패 종목 {len(failures)}개 보기'):
+            st.dataframe([{'코드':c,'종목':n,'오류':e[:240]} for c,n,e in failures],hide_index=True,use_container_width=True)
 st.info('주식 데이터는 제공처 사정에 따라 지연·누락될 수 있습니다. 4시간봉은 한국 정규장을 09~13시/13~15:30으로 나눈 사용자 정의 봉입니다. 시장 지표는 투자 판단 참고용입니다.')

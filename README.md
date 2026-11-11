@@ -29,3 +29,11 @@
 8. (선택) Settings → Secrets and variables → Actions → **Variables**에 `WATCH_CODES`를 `005930,000660,035420,247540` 형태로 추가합니다. 미설정 시 기본 관심 종목 4개를 사용합니다.
 
 **주의**: Streamlit 화면에서 변경한 관심 종목은 GitHub Actions 설정에 자동으로 저장되지 않습니다. 자동 알림 감시 종목을 바꾸려면 `WATCH_CODES` 변수도 변경해야 합니다. `.KQ` 종목인데 목록에 없는 종목 코드를 직접 넣으면 코스피로 추정할 수 있어 데이터를 못 가져올 수 있습니다.
+
+
+## v1.1 개선
+- 자동 탐색 버튼을 누르면 매수 신호 종목과 별도로 **매수 관심 TOP 10**을 표시합니다. RSI 오름차순, 30거래일 고점 대비 하락률 오름차순 정렬이며 **매수 신호가 아닙니다**.
+- 모바일 제목과 지표 크기를 조정했습니다.
+- GitHub Actions > Fear-RSI STOCK alerts > Run workflow에서 `mode=test`를 선택하면 **텔레그램 연결 테스트 메시지 1회**만 보냅니다. 종목 조회나 알림 상태 기록을 하지 않습니다. `mode=scan`은 기존 신호 감시입니다.
+- GitHub Actions 로그에 조회 실패 종목과 오류 이유를 개별 출력합니다.
+- 주의: 앱에서 입력한 관심 종목은 앱 세션용입니다. 자동 알림의 관심 종목은 GitHub Repository Variables의 `WATCH_CODES` (쉼표 구분 6자리 종목코드)로 별도 설정합니다.

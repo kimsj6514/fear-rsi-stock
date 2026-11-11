@@ -1,12 +1,21 @@
 """Scheduled Telegram notification; sends only when the stock signal changes."""
-import csv,json,os
+import argparse,csv,json,os
 from pathlib import Path
 import requests
 from signals import WATCH_DEFAULT,load_universe,market_mood,analyze_stock
 STATE=Path('stock_alert_state.json'); HISTORY=Path('stock_signal_history.csv')
 def main():
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--test-telegram',action='store_true',help='Send one connection test only; no signal scan or state changes')
+    args=parser.parse_args()
     token=os.environ.get('TELEGRAM_BOT_TOKEN');chat=os.environ.get('TELEGRAM_CHAT_ID')
     if not token or not chat:raise RuntimeError('텔레그램 Secrets 설정 필요')
+    if args.test_telegram:
+        response=requests.post(f'https://api.telegram.org/bot{token}/sendMessage',json={'chat_id':chat,'text':'✅ Fear-RSI STOCK v1.1 텔레그램 연결 테스트 성공!\n이 메시지는 매수·매도 신호가 아닌 테스트 알림입니다.','disable_web_page_preview':True},timeout=20)
+        response.raise_for_status()
+        if not response.json().get('ok'):raise RuntimeError('Telegram test sendMessage 실패')
+        print('Telegram test message sent successfully')
+        return
     old=json.loads(STATE.read_text(encoding='utf-8')) if STATE.exists() else {}; new=dict(old)
     mood=market_mood();universe,source=load_universe(80); bycode={x['code']:x for x in universe}
     for code,name in WATCH_DEFAULT.items():bycode.setdefault(code,{'code':code,'name':name,'market':'KOSDAQ' if code in ('247540','086520') else 'KOSPI'})
@@ -43,6 +52,7 @@ def main():
             writer.writerows(messages)
     print(f'Checked {len(selected)} / sent {len(messages)} / failures {len(failures)} / source {source}')
     if failures:
-        print('Failures:', '; '.join(failures[:10]))
+        print('Failures:', '; '.join(failures[:20]))
+        for failure in failures: print('FAILED:',failure)
         if len(failures)==len(selected):raise RuntimeError('모든 종목 조회 실패')
 if __name__=='__main__':main()
